@@ -44,13 +44,29 @@ function isDirectory(path: string): boolean {
 }
 
 function getAxeSourceBuildCandidates(sourcePath: string): string[] {
-  const candidates = [join(sourcePath, '.build', 'release', 'axe')];
+  const candidates = [
+    join(sourcePath, '.build', 'release', 'axe'),
+    join(sourcePath, '.build', 'out', 'Products', 'Release', 'axe'),
+  ];
   const swiftBuildDir = join(sourcePath, '.build');
 
   if (isDirectory(swiftBuildDir)) {
     for (const entry of readdirSync(swiftBuildDir, { withFileTypes: true })) {
       if (entry.isDirectory() && entry.name.endsWith('-apple-macosx')) {
         candidates.push(join(swiftBuildDir, entry.name, 'release', 'axe'));
+      }
+    }
+  }
+
+  candidates.push(
+    join(sourcePath, '.build', 'debug', 'axe'),
+    join(sourcePath, '.build', 'out', 'Products', 'Debug', 'axe'),
+  );
+
+  if (isDirectory(swiftBuildDir)) {
+    for (const entry of readdirSync(swiftBuildDir, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name.endsWith('-apple-macosx')) {
+        candidates.push(join(swiftBuildDir, entry.name, 'debug', 'axe'));
       }
     }
   }
@@ -75,7 +91,7 @@ function resolveAxePathFromSourceConfig(): string | null {
   }
 
   throw new Error(
-    `Configured axeSourcePath does not contain an executable release AXe build. Expected one of: ${candidates.join(', ')}`,
+    `Configured axeSourcePath does not contain an executable AXe build. Expected one of: ${candidates.join(', ')}`,
   );
 }
 
@@ -167,7 +183,7 @@ export function areAxeToolsAvailable(): boolean {
 export const AXE_NOT_AVAILABLE_MESSAGE =
   'AXe tool not found. UI automation features are not available.\n\n' +
   'Install AXe (brew tap cameroncooke/axe && brew install axe) or set XCODEBUILDMCP_AXE_PATH.\n' +
-  'For local source validation, set XCODEBUILDMCP_AXE_SOURCE_PATH to an AXe checkout with a release build.\n' +
+  'For local source validation, set XCODEBUILDMCP_AXE_SOURCE_PATH to an AXe checkout with a built AXe executable.\n' +
   'Ensure bundled artifacts are included or PATH is configured.';
 
 /**

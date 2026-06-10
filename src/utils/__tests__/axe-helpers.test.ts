@@ -122,6 +122,24 @@ describe('axe-helpers', () => {
     expect(resolveAxeBinary()).toEqual({ path: sourceAxePath, source: 'source' });
   });
 
+  it('resolves AXe source builds from SwiftPM Xcode-style product output', () => {
+    const sourceRoot = join(tempDir, 'AXe');
+    const sourceAxePath = join(sourceRoot, '.build', 'out', 'Products', 'Release', 'axe');
+    writeExecutable(sourceAxePath);
+    process.env.XCODEBUILDMCP_AXE_SOURCE_PATH = sourceRoot;
+
+    expect(resolveAxeBinary()).toEqual({ path: sourceAxePath, source: 'source' });
+  });
+
+  it('uses a debug AXe source build when no release build exists', () => {
+    const sourceRoot = join(tempDir, 'AXe');
+    const sourceAxePath = join(sourceRoot, '.build', 'out', 'Products', 'Debug', 'axe');
+    writeExecutable(sourceAxePath);
+    process.env.XCODEBUILDMCP_AXE_SOURCE_PATH = sourceRoot;
+
+    expect(resolveAxeBinary()).toEqual({ path: sourceAxePath, source: 'source' });
+  });
+
   it('keeps explicit axePath precedence over axeSourcePath', () => {
     const configuredAxePath = join(tempDir, 'configured', 'axe');
     writeExecutable(configuredAxePath);

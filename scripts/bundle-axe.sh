@@ -10,8 +10,15 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BUNDLED_DIR="$PROJECT_ROOT/bundled"
 AXE_LOCAL_DIR="${AXE_LOCAL_DIR:-}"
 AXE_TEMP_DIR="/tmp/axe-download-$$"
+AXE_RELEASE_REPOSITORY="${AXE_RELEASE_REPOSITORY:-cameroncooke/AXe}"
 
 echo "🔨 Preparing AXe artifacts for bundling..."
+
+if [[ ! "$AXE_RELEASE_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+    echo "❌ Invalid AXE_RELEASE_REPOSITORY: $AXE_RELEASE_REPOSITORY"
+    echo "   Expected GitHub owner/repo format, for example cameroncooke/AXe"
+    exit 1
+fi
 
 # Single source of truth for AXe version (overridable)
 # 1) Use $AXE_VERSION if provided in env
@@ -27,6 +34,7 @@ else
     PINNED_AXE_VERSION="$DEFAULT_AXE_VERSION"
 fi
 echo "📌 Using AXe version: $PINNED_AXE_VERSION"
+echo "📌 Using AXe release repository: $AXE_RELEASE_REPOSITORY"
 
 # Clean up any existing bundled directory
 if [ -d "$BUNDLED_DIR" ]; then
@@ -43,6 +51,51 @@ if [ -z "${AXE_FORCE_REMOTE}" ] && [ "${AXE_USE_LOCAL:-0}" = "1" ]; then
     USE_LOCAL_AXE=true
 fi
 
+find_local_axe_build_dir() {
+    local candidates=(
+        ".build/release"
+        ".build/out/Products/Release"
+    )
+
+    for target_dir in .build/*-apple-macosx/release; do
+        if [ -d "$target_dir" ]; then
+            candidates+=("$target_dir")
+        fi
+    done
+
+    for build_dir in "${candidates[@]}"; do
+        if [ -f "$build_dir/axe" ]; then
+            echo "$build_dir"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+copy_local_axe_frameworks() {
+    local build_dir="$1"
+    local frameworks=()
+
+    shopt -s nullglob
+    frameworks=("$build_dir"/*.framework)
+    if [ ${#frameworks[@]} -eq 0 ] && [ -d "$build_dir/ExecutableModules" ]; then
+        frameworks=("$build_dir/ExecutableModules"/*.framework)
+    fi
+    shopt -u nullglob
+
+    for framework in "${frameworks[@]}"; do
+        echo "📦 Copying framework: $(basename "$framework")"
+        cp -R "$framework" "$BUNDLED_DIR/Frameworks/"
+
+        # Only copy nested frameworks if they exist
+        if [ -d "$framework/Frameworks" ]; then
+            echo "📦 Found nested frameworks in $(basename "$framework")"
+            cp -R "$framework/Frameworks"/* "$BUNDLED_DIR/Frameworks/" 2>/dev/null || true
+        fi
+    done
+}
+
 # Use local AXe build only when explicitly requested, otherwise download from GitHub releases.
 if [ "$USE_LOCAL_AXE" = true ] && [ -d "$AXE_LOCAL_DIR" ] && [ -f "$AXE_LOCAL_DIR/Package.swift" ]; then
     echo "🏠 Using local AXe source at $AXE_LOCAL_DIR"
@@ -52,17 +105,19 @@ if [ "$USE_LOCAL_AXE" = true ] && [ -d "$AXE_LOCAL_DIR" ] && [ -f "$AXE_LOCAL_DI
     echo "🔨 Building AXe in release configuration..."
     swift build --configuration release
 
-    # Check if build succeeded
-    if [ ! -f ".build/release/axe" ]; then
+    if ! AXE_BUILD_DIR="$(find_local_axe_build_dir)"; then
         echo "❌ AXe build failed - binary not found"
+        echo "   Checked .build/release, .build/out/Products/Release, and target-specific release directories"
         exit 1
     fi
 
     echo "✅ AXe build completed successfully"
+    echo "📁 AXe build products: $AXE_BUILD_DIR"
 
     # Copy binary to bundled directory
     echo "📦 Copying AXe binary..."
-    cp ".build/release/axe" "$BUNDLED_DIR/"
+    cp "$AXE_BUILD_DIR/axe" "$BUNDLED_DIR/"
+    chmod +x "$BUNDLED_DIR/axe"
 
     # Fix rpath to find frameworks in Frameworks/ subdirectory
     echo "🔧 Configuring AXe binary rpath for bundled frameworks..."
@@ -72,19 +127,7 @@ if [ "$USE_LOCAL_AXE" = true ] && [ -d "$AXE_LOCAL_DIR" ] && [ -f "$AXE_LOCAL_DI
     echo "📦 Copying frameworks..."
     mkdir -p "$BUNDLED_DIR/Frameworks"
 
-    # Copy frameworks with better error handling
-    for framework in .build/release/*.framework; do
-        if [ -d "$framework" ]; then
-            echo "📦 Copying framework: $(basename "$framework")"
-            cp -R "$framework" "$BUNDLED_DIR/Frameworks/"
-
-            # Only copy nested frameworks if they exist
-            if [ -d "$framework/Frameworks" ]; then
-                echo "📦 Found nested frameworks in $(basename "$framework")"
-                cp -R "$framework/Frameworks"/* "$BUNDLED_DIR/Frameworks/" 2>/dev/null || true
-            fi
-        fi
-    done
+    copy_local_axe_frameworks "$AXE_BUILD_DIR"
 else
     if [ "$USE_LOCAL_AXE" = true ]; then
         echo "❌ AXE_USE_LOCAL=1 requires AXE_LOCAL_DIR to point to a valid AXe checkout"
@@ -101,7 +144,7 @@ else
         AXE_RELEASE_TAG="v${PINNED_AXE_VERSION}"
         AXE_ASSET_VERSION="v${PINNED_AXE_VERSION}"
     fi
-    AXE_RELEASE_BASE_URL="https://github.com/cameroncooke/AXe/releases/download/${AXE_RELEASE_TAG}"
+    AXE_RELEASE_BASE_URL="https://github.com/${AXE_RELEASE_REPOSITORY}/releases/download/${AXE_RELEASE_TAG}"
     AXE_HOMEBREW_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-homebrew-${AXE_ASSET_VERSION}.tar.gz"
     AXE_UNIVERSAL_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-${AXE_ASSET_VERSION}-universal.tar.gz"
     AXE_LEGACY_URL="${AXE_RELEASE_BASE_URL}/AXe-macOS-${AXE_ASSET_VERSION}.tar.gz"

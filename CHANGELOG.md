@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed Xcode 27 UI automation compatibility by routing tap, touch, key press, and text input through the patched AXe/idb HID path instead of the temporary direct CoreDevice shim, preserving existing delay, duration, semantic targeting, and replace-existing behavior.
+- Fixed local AXe source and bundle resolution so XcodeBuildMCP can consume AXe SwiftPM products from `.build/out/Products/Release` and `.build/out/Products/Debug`.
+- Fixed AXe bundling configuration so release artifacts can be sourced from a fork via `AXE_RELEASE_REPOSITORY`.
+
 ## [2.6.2]
 
 ### Fixed
@@ -681,6 +689,4 @@ Please note that the UI automation features are an early preview and currently i
 ## [v1.0.1] - 2025-04-02
 - Initial release of XcodeBuildMCP
 - Basic support for building iOS and macOS applications
-
-
 

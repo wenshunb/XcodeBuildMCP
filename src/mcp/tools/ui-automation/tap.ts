@@ -23,15 +23,6 @@ import {
   executeSemanticTapWithAmbiguityFallback,
 } from './shared/semantic-tap.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
-import {
-  runInputAction,
-  shouldUseXcode27XCTestInputFallback,
-} from './shared/xctest-input-runner.ts';
-import {
-  executeCoreDeviceHIDCommand,
-  getCoreDeviceHIDSurfaceArgs,
-  isCoreDeviceHIDCapabilityFailure,
-} from './shared/coredevice-hid.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 export type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
@@ -112,116 +103,6 @@ export function createTapExecutor(
       });
       if (guard.blockedMessage) {
         return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-      }
-
-      if (shouldUseXcode27XCTestInputFallback()) {
-        log(
-          'info',
-          `${LOG_PREFIX}/${toolName}: Trying CoreDevice HID shim for Xcode 27 on ${simulatorId}`,
-        );
-        try {
-          await executeCoreDeviceHIDCommand(
-            [
-              'tap',
-              String(activationPoint.x),
-              String(activationPoint.y),
-              ...getCoreDeviceHIDSurfaceArgs(resolution.snapshot),
-            ],
-            simulatorId,
-            'tap',
-            executor,
-          );
-          clearRuntimeSnapshot(simulatorId);
-          log('info', `${LOG_PREFIX}/${toolName}: CoreDevice HID shim succeeded for ${simulatorId}`);
-          const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-            simulatorId,
-            executor,
-            axeHelpers,
-          });
-          return createUiActionSuccessResult(
-            action,
-            simulatorId,
-            [guard.warningText, captureResult.warning],
-            {
-              ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-              previousRuntimeSnapshot: resolution.snapshot.payload,
-              ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-            },
-          );
-        } catch (error) {
-          clearRuntimeSnapshot(simulatorId);
-          const message = error instanceof Error ? error.message : String(error);
-          log('error', `${LOG_PREFIX}/${toolName}: CoreDevice HID shim failed - ${message}`);
-          if (isCoreDeviceHIDCapabilityFailure(error)) {
-            return createUiActionFailureResult(
-              action,
-              simulatorId,
-              `Failed to simulate tap on elementRef ${elementRef}.`,
-              {
-                details: [message],
-                uiError: createUiAutomationRecoverableError({
-                  code: 'ACTION_FAILED',
-                  message,
-                  elementRef,
-                }),
-              },
-            );
-          }
-          log(
-            'warn',
-            `${LOG_PREFIX}/${toolName}: Falling back to XCTest input runner after CoreDevice HID failure`,
-          );
-        }
-
-        log(
-          'info',
-          `${LOG_PREFIX}/${toolName}: Using XCTest input fallback for Xcode 27 on ${simulatorId}`,
-        );
-        try {
-          await runInputAction({
-            action: 'tap',
-            simulatorId,
-            snapshot: resolution.snapshot,
-            element: resolution.element,
-            activationPoint,
-            executor,
-          });
-          clearRuntimeSnapshot(simulatorId);
-          log('info', `${LOG_PREFIX}/${toolName}: XCTest input fallback succeeded for ${simulatorId}`);
-        } catch (error) {
-          clearRuntimeSnapshot(simulatorId);
-          const message = error instanceof Error ? error.message : String(error);
-          log('error', `${LOG_PREFIX}/${toolName}: XCTest input fallback failed - ${message}`);
-          return createUiActionFailureResult(
-            action,
-            simulatorId,
-            `Failed to simulate tap on elementRef ${elementRef}.`,
-            {
-              details: [message],
-              uiError: createUiAutomationRecoverableError({
-                code: 'ACTION_FAILED',
-                message,
-                elementRef,
-              }),
-            },
-          );
-        }
-
-        const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-          simulatorId,
-          executor,
-          axeHelpers,
-        });
-        return createUiActionSuccessResult(
-          action,
-          simulatorId,
-          [guard.warningText, captureResult.warning],
-          {
-            ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-            previousRuntimeSnapshot: resolution.snapshot.payload,
-            ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-          },
-        );
       }
 
       const usesTouchActivation = resolution.element.publicElement.role === 'switch';

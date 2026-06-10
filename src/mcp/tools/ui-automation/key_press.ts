@@ -20,8 +20,6 @@ import {
   captureRuntimeSnapshotAfterActionSafely,
   type PostActionSnapshotTiming,
 } from './shared/post-action-snapshot.ts';
-import { shouldUseXcode27XCTestInputFallback } from './shared/xctest-input-runner.ts';
-import { executeCoreDeviceHIDCommand } from './shared/coredevice-hid.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -73,45 +71,6 @@ export function createKeyPressExecutor(
       });
       if (guard.blockedMessage) {
         return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
-      }
-
-      if (shouldUseXcode27XCTestInputFallback()) {
-        log(
-          'info',
-          `${LOG_PREFIX}/${toolName}: Trying CoreDevice HID shim for Xcode 27 key press ${keyCode} on ${simulatorId}`,
-        );
-        try {
-          await executeCoreDeviceHIDCommand(['key', String(keyCode)], simulatorId, 'key', executor);
-          clearRuntimeSnapshot(simulatorId);
-          log('info', `${LOG_PREFIX}/${toolName}: CoreDevice HID shim succeeded for ${simulatorId}`);
-          const captureResult = await captureRuntimeSnapshotAfterActionSafely({
-            simulatorId,
-            executor,
-            axeHelpers,
-            timing: postActionSnapshotTiming,
-          });
-          return createUiActionSuccessResult(
-            action,
-            simulatorId,
-            [guard.warningText, captureResult.warning],
-            {
-              ...(captureResult.capture ? { capture: captureResult.capture } : {}),
-              ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
-            },
-          );
-        } catch (error) {
-          clearRuntimeSnapshot(simulatorId);
-          const message = error instanceof Error ? error.message : String(error);
-          log('error', `${LOG_PREFIX}/${toolName}: CoreDevice HID shim failed - ${message}`);
-          return createUiActionFailureResult(
-            action,
-            simulatorId,
-            `Failed to simulate key press (code: ${keyCode}).`,
-            {
-              details: [message],
-            },
-          );
-        }
       }
 
       const commandArgs = ['key', String(keyCode)];
