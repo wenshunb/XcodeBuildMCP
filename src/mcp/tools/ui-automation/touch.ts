@@ -25,6 +25,11 @@ import {
 import { getRuntimeElementActivationPoint } from './shared/runtime-snapshot.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
 import { executeAxeCommand, defaultAxeHelpers } from './shared/axe-command.ts';
+import { shouldUseXcode27XCTestInputFallback } from './shared/xctest-input-runner.ts';
+import {
+  executeCoreDeviceHIDCommand,
+  getCoreDeviceHIDSurfaceArgs,
+} from './shared/coredevice-hid.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -118,6 +123,57 @@ export function createTouchExecutor(
       });
       if (guard.blockedMessage) {
         return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      if (shouldUseXcode27XCTestInputFallback()) {
+        const coreDeviceAction = down && up ? 'down-up' : down ? 'down' : 'up';
+        log(
+          'info',
+          `${LOG_PREFIX}/${toolName}: Trying CoreDevice HID shim ${coreDeviceAction} for Xcode 27 on ${simulatorId}`,
+        );
+        try {
+          await executeCoreDeviceHIDCommand(
+            [
+              'touch',
+              String(center.x),
+              String(center.y),
+              coreDeviceAction,
+              ...getCoreDeviceHIDSurfaceArgs(resolution.snapshot),
+            ],
+            simulatorId,
+            'touch',
+            executor,
+          );
+          clearRuntimeSnapshot(simulatorId);
+          log('info', `${LOG_PREFIX}/${toolName}: CoreDevice HID shim succeeded for ${simulatorId}`);
+          const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+            simulatorId,
+            executor,
+            axeHelpers,
+          });
+          return createUiActionSuccessResult(
+            action,
+            simulatorId,
+            [guard.warningText, captureResult.warning],
+            {
+              ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+              previousRuntimeSnapshot: resolution.snapshot.payload,
+              ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+            },
+          );
+        } catch (error) {
+          clearRuntimeSnapshot(simulatorId);
+          const message = error instanceof Error ? error.message : String(error);
+          log('error', `${LOG_PREFIX}/${toolName}: CoreDevice HID shim failed - ${message}`);
+          return createUiActionFailureResult(action, simulatorId, 'Failed to execute touch event.', {
+            details: [message],
+            uiError: createUiAutomationRecoverableError({
+              code: 'ACTION_FAILED',
+              message,
+              elementRef,
+            }),
+          });
+        }
       }
 
       const commandArgs = ['touch', '-x', String(center.x), '-y', String(center.y)];

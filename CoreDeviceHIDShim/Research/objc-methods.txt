@@ -1,0 +1,64 @@
+dlopen /Library/Developer/PrivateFrameworks/CoreDevice.framework/Versions/A/Frameworks/UniversalHID.framework/UniversalHID => 0x39a7d8020 err=
+dlopen /Library/Developer/PrivateFrameworks/CoreDevice.framework/CoreDevice => 0x39a7db4e0 err=
+
+CLASS CoreDevice.DeviceManager => CoreDevice.DeviceManager
++ CoreDevice.DeviceManager methods=0
+- CoreDevice.DeviceManager methods=0
+
+CLASS CoreDevice.RemoteDevice => CoreDevice.RemoteDevice
++ CoreDevice.RemoteDevice methods=0
+- CoreDevice.RemoteDevice methods=0
+
+CLASS CoreDevice.DDIUniversalHIDService => CoreDevice.DDIUniversalHIDService
++ CoreDevice.DDIUniversalHIDService methods=0
+- CoreDevice.DDIUniversalHIDService methods=0
+
+CLASS CoreDevice.HIDXPCService => CoreDevice.HIDXPCService
++ CoreDevice.HIDXPCService methods=0
+- CoreDevice.HIDXPCService methods=0
+
+CLASS CoreDevice.UniversalHIDDefaultEventService => CoreDevice.UniversalHIDDefaultEventService
++ CoreDevice.UniversalHIDDefaultEventService methods=0
+- CoreDevice.UniversalHIDDefaultEventService methods=0
+
+CLASS CoreDevice.UniversalHIDKeyboard => CoreDevice.UniversalHIDKeyboard
++ CoreDevice.UniversalHIDKeyboard methods=0
+- CoreDevice.UniversalHIDKeyboard methods=0
+
+CLASS CoreDevice.UniversalHIDPointer => CoreDevice.UniversalHIDPointer
++ CoreDevice.UniversalHIDPointer methods=0
+- CoreDevice.UniversalHIDPointer methods=0
+
+CLASS CoreDevice.IndigoHIDDigitizer => CoreDevice.IndigoHIDDigitizer
++ CoreDevice.IndigoHIDDigitizer methods=0
+- CoreDevice.IndigoHIDDigitizer methods=0
+
+CLASS CoreDevice.IndigoHIDButton => CoreDevice.IndigoHIDButton
++ CoreDevice.IndigoHIDButton methods=0
+- CoreDevice.IndigoHIDButton methods=0
+
+CLASS UniversalHID.HIDVirtualService => UniversalHID.HIDVirtualService
++ UniversalHID.HIDVirtualService methods=0
+- UniversalHID.HIDVirtualService methods=0
+
+CLASS UniversalHID.HIDVirtualServicePool => UniversalHID.HIDVirtualServicePool
++ UniversalHID.HIDVirtualServicePool methods=0
+- UniversalHID.HIDVirtualServicePool methods=0
+
+CLASS UniversalHID.HIDConnection => (nil)
+
+CLASS UniversalHID.HIDEventService => (nil)
+
+CLASS UniversalHID.HIDUserDevice => (nil)
+
+CLASS UniversalHID.KeyboardGesture => UniversalHID.KeyboardGesture
++ UniversalHID.KeyboardGesture methods=0
+- UniversalHID.KeyboardGesture methods=0
+
+CLASS UniversalHID.DigitizerGesture => UniversalHID.DigitizerGesture
++ UniversalHID.DigitizerGesture methods=0
+- UniversalHID.DigitizerGesture methods=0
+
+CLASS UniversalHID.PointerGesture => UniversalHID.PointerGesture
++ UniversalHID.PointerGesture methods=0
+- UniversalHID.PointerGesture methods=0

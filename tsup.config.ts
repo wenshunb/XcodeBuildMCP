@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
-import { chmodSync, existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { glob } from 'glob';
-import { join } from 'path';
+import { dirname, join } from 'path';
 
 /**
  * Recursively rewrites .ts imports to .js in all JavaScript files.
@@ -56,6 +56,14 @@ export default defineConfig({
       if (existsSync(file)) {
         chmodSync(file, '755');
       }
+    }
+
+    const coreDeviceHidCli = 'src/mcp/tools/ui-automation/bin/coredevice_hid_cli';
+    if (existsSync(coreDeviceHidCli)) {
+      const destination = 'build/mcp/tools/ui-automation/bin/coredevice_hid_cli';
+      mkdirSync(dirname(destination), { recursive: true });
+      copyFileSync(coreDeviceHidCli, destination);
+      chmodSync(destination, '755');
     }
   },
 });

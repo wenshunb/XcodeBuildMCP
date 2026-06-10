@@ -28,6 +28,16 @@ import {
   executeSemanticTapWithAmbiguityFallback,
 } from './shared/semantic-tap.ts';
 import { captureRuntimeSnapshotAfterActionSafely } from './shared/post-action-snapshot.ts';
+import { getRuntimeElementActivationPoint } from './shared/runtime-snapshot.ts';
+import {
+  runInputAction,
+  shouldUseXcode27XCTestInputFallback,
+} from './shared/xctest-input-runner.ts';
+import {
+  executeCoreDeviceHIDCommand,
+  getCoreDeviceHIDSurfaceArgs,
+  isCoreDeviceHIDCapabilityFailure,
+} from './shared/coredevice-hid.ts';
 import type { AxeHelpers } from './shared/axe-command.ts';
 import type { NonStreamingExecutor } from '../../../types/tool-execution.ts';
 import type { UiActionResultDomainResult } from '../../../types/domain-results.ts';
@@ -102,6 +112,129 @@ export function createTypeTextExecutor(
       });
       if (guard.blockedMessage) {
         return createUiActionFailureResult(action, simulatorId, guard.blockedMessage);
+      }
+
+      if (shouldUseXcode27XCTestInputFallback()) {
+        if (replaceExisting !== true) {
+          log(
+            'info',
+            `${LOG_PREFIX}/${toolName}: Trying CoreDevice HID shim for Xcode 27 on ${simulatorId}`,
+          );
+          try {
+            const activationPoint = getRuntimeElementActivationPoint(resolution.element);
+            await executeCoreDeviceHIDCommand(
+              [
+                'tap',
+                String(activationPoint.x),
+                String(activationPoint.y),
+                ...getCoreDeviceHIDSurfaceArgs(resolution.snapshot),
+              ],
+              simulatorId,
+              'tap',
+              executor,
+            );
+            await executeCoreDeviceHIDCommand(['type', text], simulatorId, 'type', executor);
+            clearRuntimeSnapshot(simulatorId);
+            log(
+              'info',
+              `${LOG_PREFIX}/${toolName}: CoreDevice HID shim succeeded for ${simulatorId}`,
+            );
+            const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+              simulatorId,
+              executor,
+              axeHelpers,
+            });
+            return createUiActionSuccessResult(
+              action,
+              simulatorId,
+              [guard.warningText, captureResult.warning],
+              {
+                ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+                ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+              },
+            );
+          } catch (error) {
+            clearRuntimeSnapshot(simulatorId);
+            const message = error instanceof Error ? error.message : String(error);
+            log('error', `${LOG_PREFIX}/${toolName}: CoreDevice HID shim failed - ${message}`);
+            if (isCoreDeviceHIDCapabilityFailure(error)) {
+              return createUiActionFailureResult(
+                action,
+                simulatorId,
+                `Failed to type text into elementRef ${elementRef}.`,
+                {
+                  details: [message],
+                  uiError: createUiAutomationRecoverableError({
+                    code: 'ACTION_FAILED',
+                    message,
+                    elementRef,
+                  }),
+                },
+              );
+            }
+            log(
+              'warn',
+              `${LOG_PREFIX}/${toolName}: Falling back to XCTest input runner after CoreDevice HID failure`,
+            );
+          }
+        } else {
+          log(
+            'info',
+            `${LOG_PREFIX}/${toolName}: replaceExisting uses XCTest input fallback on Xcode 27`,
+          );
+        }
+
+        log(
+          'info',
+          `${LOG_PREFIX}/${toolName}: Using XCTest input fallback for Xcode 27 on ${simulatorId}`,
+        );
+        try {
+          const activationPoint = getRuntimeElementActivationPoint(resolution.element);
+          await runInputAction({
+            action: 'type-text',
+            simulatorId,
+            snapshot: resolution.snapshot,
+            element: resolution.element,
+            activationPoint,
+            text,
+            replaceExisting: replaceExisting === true,
+            executor,
+          });
+          clearRuntimeSnapshot(simulatorId);
+          log('info', `${LOG_PREFIX}/${toolName}: XCTest input fallback succeeded for ${simulatorId}`);
+        } catch (error) {
+          clearRuntimeSnapshot(simulatorId);
+          const message = error instanceof Error ? error.message : String(error);
+          log('error', `${LOG_PREFIX}/${toolName}: XCTest input fallback failed - ${message}`);
+          return createUiActionFailureResult(
+            action,
+            simulatorId,
+            `Failed to type text into elementRef ${elementRef}.`,
+            {
+              details: [message],
+              uiError: createUiAutomationRecoverableError({
+                code: 'ACTION_FAILED',
+                message,
+                elementRef,
+              }),
+            },
+          );
+        }
+
+        const captureResult = await captureRuntimeSnapshotAfterActionSafely({
+          simulatorId,
+          executor,
+          axeHelpers,
+        });
+        return createUiActionSuccessResult(
+          action,
+          simulatorId,
+          [guard.warningText, captureResult.warning],
+          {
+            ...(captureResult.capture ? { capture: captureResult.capture } : {}),
+            ...(captureResult.uiError ? { uiError: captureResult.uiError } : {}),
+          },
+        );
       }
 
       if (containsUnsupportedAxeTypeText(text)) {
